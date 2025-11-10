@@ -8,5 +8,8 @@
 # Test binary, built with `go test -c`
 *.test
 
+# App binary
+kubevirt-apiserver-proxy
+
 # Go workspace file
 go.work

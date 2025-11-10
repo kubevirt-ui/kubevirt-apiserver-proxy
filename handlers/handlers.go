@@ -5,15 +5,23 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/proxy"
 	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/util"
 )
 
-var API_SERVER_URL string = "kubernetes.default.svc"
+var API_SERVER_URL string = getEnvOrDefault("KUBE_API_SERVER", "kubernetes.default.svc")
 var PROTOCOL string = "https"
 var ORIGIN = "http://localhost"
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 func HealthHandler(c *gin.Context) {
 	defer c.Request.Body.Close()
@@ -63,6 +71,8 @@ func RequestHandler(c *gin.Context) {
 		resp, err := httpClient.Do(c.Request)
 		if err != nil {
 			log.Println("Failed to initiate call to kube api server: ", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to Kubernetes API server"})
+			return
 		}
 
 		bodyBytes, err := io.ReadAll(resp.Body)

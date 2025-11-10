@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
 	cache "github.com/chenyahui/gin-cache"
@@ -25,7 +26,12 @@ func main() {
 
 	log.Printf("listening for server 8080 - v0.0.10 - API cache time: %v", API_CACHE_TIME)
 
-	err := server.RunTLS(":8080", "./cert/tls.crt", "./cert/tls.key") // listen and serve on 0.0.0.0:8080
+	var err error
+	if os.Getenv("APP_ENV") == "dev" {
+		err = server.Run(":8080")
+	} else {
+		err = server.RunTLS(":8080", "./cert/tls.crt", "./cert/tls.key")
+	}
 
 	if err != nil {
 		log.Println("Failed to start server: ", err.Error())
