@@ -4,6 +4,12 @@ Kubevirt UI proxy data pod resolve the performance issue in large scale cluster 
 
 ## Usage
 
+### Local development
+
+1. `oc login` into the cluster
+2. run `./start-proxy.sh`
+   - builds a `kubevirt-apiserver-proxy` binary and runs at `localhost:8080`
+
 ### Dev mode deployment
 
 Save this YAML to a file locally:
