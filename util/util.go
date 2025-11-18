@@ -197,6 +197,55 @@ func isIPExist(interfaces []interface{}, search string) bool {
 	return result
 }
 
+func itemValueMatchesFilter(itemValue gjson.Result, key string, queryValue string) bool {
+	searchValues := strings.Split(queryValue, ",")
+
+	switch itemValueType := itemValue.Type.String(); itemValueType {
+	case "JSON":
+		// ALL search values must match (AND logic)
+		for _, search := range searchValues {
+			switch key {
+			case "status.conditions":
+				if !isMigratable(itemValue.Value().([]interface{}), search) {
+					return false
+				}
+			case "status.interfaces":
+				if !isIPExist(itemValue.Value().([]interface{}), search) {
+					return false
+				}
+			default:
+				if !labelsIncludes(itemValue.Value().(map[string]interface{}), search) {
+					return false
+				}
+			}
+		}
+		return true
+
+	case "String":
+		// ANY search value can match (OR logic)
+		for _, search := range searchValues {
+			if strings.Contains(strings.ToLower(itemValue.Str), strings.ToLower(search)) {
+				return true
+			}
+		}
+		return false
+
+	case "Null":
+		// ALL search values must be "null" (AND logic)
+		for _, search := range searchValues {
+			if strings.ToLower(search) != "null" {
+				return false
+			}
+		}
+		return true
+
+	default:
+		return false // Unsupported type
+	}
+}
+
+const KEY_DELIMITER = "|"
+
 func FilterResponseQuery(bodyBytes []byte, query url.Values) map[string]interface{} {
 	items := gjson.ParseBytes(bodyBytes).Get("items").Array()
 	filteredJson := []interface{}{}
@@ -204,61 +253,35 @@ func FilterResponseQuery(bodyBytes []byte, query url.Values) map[string]interfac
 	if isFilters {
 	nextItem:
 		for _, item := range items {
-			for key, val := range query {
-				for _, match := range val {
-					itemValue := item.Get(key)
-					matches := strings.Split(match, ",")
-					isMatch := false
-					for index, search := range matches {
-						switch typeResult := itemValue.Type.String(); typeResult {
-						case "JSON":
-							{
-								// case of json and all conditions (and) must apply (labels by input)
-								if key == "status.conditions" {
-									isMigrate := isMigratable(itemValue.Value().([]interface{}), search)
-									if !isMigrate {
-										continue nextItem
-									}
-									continue
-								}
-								if key == "status.interfaces" {
-									isIP := isIPExist(itemValue.Value().([]interface{}), search)
-									if !isIP {
-										continue nextItem
-									}
-									continue
-								}
-								okInclude := labelsIncludes(itemValue.Value().(map[string]interface{}), search)
-								if !okInclude {
-									continue nextItem
-								}
-							}
+			for key, values := range query {
+				// values is a slice, because same key can repeat in the query string
+				// e.g. same.key=value1,value2&same.key=value3 results in values = []string{"value1,value2", "value3"}
+				// in Kubevirt UI the query string is created such way that the key doesn't repeat, so we can use values[0]
+				value := values[0]
 
-						case "String":
-							{
-								//case of string and at least one must match (or) apply (name, template, status, os)
-								okString := strings.Contains(strings.ToLower(itemValue.Str), strings.ToLower(search))
-								if okString {
-									isMatch = true
-									break
-								}
-								if index == len(matches)-1 && !isMatch {
-									continue nextItem
-								}
-							}
-						case "Null":
-							{
-								if strings.ToLower(search) == "null" {
-									break
-								}
-								continue nextItem
-							}
-						default:
-							continue nextItem
+				if strings.Contains(key, KEY_DELIMITER) {
+					keys := strings.Split(key, KEY_DELIMITER)
+					keyMatched := false
+
+					for _, key := range keys {
+						itemValue := item.Get(key)
+						if itemValueMatchesFilter(itemValue, key, value) {
+							keyMatched = true
+							break
 						}
+					}
+
+					if !keyMatched {
+						continue nextItem
+					}
+				} else {
+					itemValue := item.Get(key)
+					if !itemValueMatchesFilter(itemValue, key, value) {
+						continue nextItem
 					}
 				}
 			}
+
 			valueJson := map[string]interface{}{}
 			err := json.Unmarshal([]byte(item.Raw), &valueJson)
 			if err != nil {
