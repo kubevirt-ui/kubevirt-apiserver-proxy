@@ -224,6 +224,9 @@ func itemValueMatchesFilter(itemValue gjson.Result, key string, queryValue strin
 	case "String":
 		// ANY search value can match (OR logic)
 		for _, search := range searchValues {
+			if key == "status.printableStatus" && search == "Error" && isErrorStatus(itemValue.Str) {
+				return true
+			}
 			if strings.Contains(strings.ToLower(itemValue.Str), strings.ToLower(search)) {
 				return true
 			}
