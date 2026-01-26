@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
+	"flag"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -9,28 +12,54 @@ import (
 	"github.com/chenyahui/gin-cache/persist"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
+	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/config"
 	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/handlers"
 )
 
-var HEALTH_CACHE_TIME = 30 * time.Second
-var API_CACHE_TIME = 15 * time.Second
+const (
+	healthCacheTime = 30 * time.Second
+	apiCacheTime    = 15 * time.Second
+)
 
 func main() {
-	server := gin.Default()
+	flag.Parse()
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	router := gin.Default()
+
 	memoryStore := persist.NewMemoryStore(1 * time.Minute)
 
-	server.Use(gzip.Gzip(gzip.DefaultCompression))
+	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
-	server.GET("/health", cache.CacheByRequestURI(memoryStore, HEALTH_CACHE_TIME), handlers.HealthHandler)
-	server.GET("/apis/*path", cache.CacheByRequestURI(memoryStore, API_CACHE_TIME), handlers.RequestHandler)
+	router.GET("/health", cache.CacheByRequestURI(memoryStore, healthCacheTime), handlers.HealthHandler)
+	router.GET("/apis/*path", cache.CacheByRequestURI(memoryStore, apiCacheTime), handlers.RequestHandler)
 
-	log.Printf("listening for server 8080 - v0.0.10 - API cache time: %v", API_CACHE_TIME)
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+		TLSConfig: &tls.Config{
+			CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+		},
+	}
 
-	var err error
+	if minTLSVer := cfg.GetMinTLSVersion(); minTLSVer != 0 {
+		server.TLSConfig.MinVersion = minTLSVer
+	}
+
+	if ciphers := cfg.GetTLSCipherSuites(); len(ciphers) > 0 {
+		server.TLSConfig.CipherSuites = ciphers
+	}
+
+	log.Printf("listening for server 8080 - v0.0.10 - API cache time: %v", apiCacheTime)
+
 	if os.Getenv("APP_ENV") == "dev" {
-		err = server.Run(":8080")
+		err = server.ListenAndServe()
 	} else {
-		err = server.RunTLS(":8080", "./cert/tls.crt", "./cert/tls.key")
+		err = server.ListenAndServeTLS("./cert/tls.crt", "./cert/tls.key")
 	}
 
 	if err != nil {

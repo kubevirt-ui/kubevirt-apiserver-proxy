@@ -13,13 +13,14 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
-          go-version: '1.23.0'
-          
+          go-version-file:
+            go.mod
+
       - name: Build
         run: go build .
       - name: Run Unit Tests
-        run: go test .
+        run: go test ./...
         
