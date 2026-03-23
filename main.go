@@ -39,19 +39,20 @@ func main() {
 	router.GET("/apis/*path", cache.CacheByRequestURI(memoryStore, apiCacheTime), handlers.RequestHandler)
 
 	server := &http.Server{
-		Addr:    ":8080",
-		Handler: router,
-		TLSConfig: &tls.Config{
-			CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
-		},
+		Addr:      ":8080",
+		Handler:   router,
+		TLSConfig: &tls.Config{},
 	}
 
-	if minTLSVer := cfg.GetMinTLSVersion(); minTLSVer != 0 {
+	minTLSVer := cfg.GetMinTLSVersion()
+	if minTLSVer != 0 {
 		server.TLSConfig.MinVersion = minTLSVer
 	}
 
-	if ciphers := cfg.GetTLSCipherSuites(); len(ciphers) > 0 {
-		server.TLSConfig.CipherSuites = ciphers
+	if minTLSVer < tls.VersionTLS13 {
+		if ciphers := cfg.GetTLSCipherSuites(); len(ciphers) > 0 {
+			server.TLSConfig.CipherSuites = ciphers
+		}
 	}
 
 	log.Printf("listening for server 8080 - v0.0.10 - API cache time: %v", apiCacheTime)
