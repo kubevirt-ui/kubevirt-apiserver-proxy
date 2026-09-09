@@ -4,7 +4,7 @@ COPY . /app
 WORKDIR /app
 RUN go build -o kubevirt-apiserver-proxy .
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal
+FROM registry.access.redhat.com/ubi10/ubi-minimal:1789645544
 WORKDIR /app
 ENV USER_UID=1001 \
     GIN_MODE=release
