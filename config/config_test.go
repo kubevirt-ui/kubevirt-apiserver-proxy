@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"math"
@@ -19,7 +20,7 @@ func TestGetTLSCipherSuites(t *testing.T) {
 		{name: "max val", flagVal: fmt.Sprintf("%d", math.MaxUint16), want: []uint16{math.MaxUint16}},
 	} {
 		t.Run(tc.flagVal, func(t *testing.T) {
-			err := setFlags("0", tc.flagVal)
+			err := setFlags("0", tc.flagVal, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -37,7 +38,7 @@ func TestGetTLSCipherSuites(t *testing.T) {
 }
 
 func TestWrongGetTLSCipherSuites_tooLarge(t *testing.T) {
-	err := setFlags("0", fmt.Sprintf("%d", math.MaxUint16+1))
+	err := setFlags("0", fmt.Sprintf("%d", math.MaxUint16+1), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func TestWrongGetTLSCipherSuites_tooLarge(t *testing.T) {
 }
 
 func TestWrongGetTLSCipherSuites_negative(t *testing.T) {
-	err := setFlags("0", "-42")
+	err := setFlags("0", "-42", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestWrongGetTLSCipherSuites_negative(t *testing.T) {
 }
 
 func TestWrongGetTLSCipherSuites_notNum(t *testing.T) {
-	err := setFlags("0", "not a number")
+	err := setFlags("0", "not a number", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +80,91 @@ func TestWrongGetTLSCipherSuites_notNum(t *testing.T) {
 }
 
 func TestWrongGetTLSCipherSuites_float(t *testing.T) {
-	err := setFlags("0", "1.42")
+	err := setFlags("0", "1.42", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = GetConfig()
+	if err == nil {
+		t.Fatal("error should have errored")
+	}
+
+	t.Logf("got expected error: %v", err)
+}
+
+func TestGetTLSCurveIds(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		flagVal string
+		want    []tls.CurveID
+	}{
+		{name: "valid input", flagVal: "1,2,3,4", want: []tls.CurveID{1, 2, 3, 4}},
+		{name: "no flag", flagVal: "", want: nil},
+		{name: "max val", flagVal: fmt.Sprintf("%d", math.MaxUint16), want: []tls.CurveID{math.MaxUint16}},
+	} {
+		t.Run(tc.flagVal, func(t *testing.T) {
+			err := setFlags("0", "", tc.flagVal)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := GetConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got, want := cfg.GetTLSCurveIDs(), tc.want; !reflect.DeepEqual(got, want) {
+				t.Errorf("GetTLSCurveIDs() = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestGetTLSCurveIds_tooLarge(t *testing.T) {
+	err := setFlags("0", "", fmt.Sprintf("%d", math.MaxUint16+1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = GetConfig()
+	if err == nil {
+		t.Fatal("error should have errored")
+	}
+
+	t.Logf("got expected error: %v", err)
+}
+
+func TestGetTLSCurveIds_negative(t *testing.T) {
+	err := setFlags("0", "", "-42")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = GetConfig()
+	if err == nil {
+		t.Fatal("error should have errored")
+	}
+
+	t.Logf("got expected error: %v", err)
+}
+
+func TestGetTLSCurveIds_notNum(t *testing.T) {
+	err := setFlags("0", "", "not a number")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = GetConfig()
+	if err == nil {
+		t.Fatal("error should have errored")
+	}
+
+	t.Logf("got expected error: %v", err)
+}
+
+func TestGetTLSCurveIds_float(t *testing.T) {
+	err := setFlags("0", "", "1.42")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +188,7 @@ func TestGetMinTLSVersion(t *testing.T) {
 		{name: "max val", flagVal: fmt.Sprintf("%d", math.MaxUint16), want: math.MaxUint16},
 	} {
 		t.Run(tc.flagVal, func(t *testing.T) {
-			err := setFlags(tc.flagVal, "")
+			err := setFlags(tc.flagVal, "", "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -121,7 +206,7 @@ func TestGetMinTLSVersion(t *testing.T) {
 }
 
 func TestWrongGetMinTLSVersion_tooLarge(t *testing.T) {
-	err := setFlags(fmt.Sprintf("%d", math.MaxUint16+1), "")
+	err := setFlags(fmt.Sprintf("%d", math.MaxUint16+1), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,12 +219,16 @@ func TestWrongGetMinTLSVersion_tooLarge(t *testing.T) {
 	t.Logf("got expected error: %v", err)
 }
 
-func setFlags(minVer, ciphers string) error {
+func setFlags(minVer, ciphers, curves string) error {
 	err := flag.Set("tls-min-version", minVer)
 	if err != nil {
 		return err
 	}
 	err = flag.Set("tls-cipher-suites", ciphers)
+	if err != nil {
+		return err
+	}
+	err = flag.Set("tls-curve-ids", curves)
 	if err != nil {
 		return err
 	}
