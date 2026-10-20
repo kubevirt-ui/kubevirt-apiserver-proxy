@@ -10,12 +10,27 @@ import (
 )
 
 const (
-	ssarAPIPath       = "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews"
-	namespacesAPIPath = "/api/v1/namespaces"
+	ssarAPIPath              = "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews"
+	namespacesAPIPath        = "/api/v1/namespaces"
+	openshiftProjectsAPIPath = "/apis/project.openshift.io/v1/projects"
 )
 
 func listAccessibleNamespaces(client *http.Client, incomingReq *http.Request) ([]string, error) {
-	req, err := http.NewRequest(http.MethodGet, handlers.APIServerBaseURL()+namespacesAPIPath, nil)
+	namespaces, err := fetchResourceNames(client, incomingReq, namespacesAPIPath)
+	if err == nil {
+		return namespaces, nil
+	}
+
+	apiErr, ok := err.(*handlers.APIError)
+	if !ok || apiErr.StatusCode != http.StatusForbidden {
+		return nil, err
+	}
+
+	return fetchResourceNames(client, incomingReq, openshiftProjectsAPIPath)
+}
+
+func fetchResourceNames(client *http.Client, incomingReq *http.Request, apiPath string) ([]string, error) {
+	req, err := http.NewRequestWithContext(incomingReq.Context(), http.MethodGet, handlers.APIServerBaseURL()+apiPath, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +93,12 @@ func createSelfSubjectAccessReview(
 		return selfSubjectAccessReviewStatus{}, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, handlers.APIServerBaseURL()+ssarAPIPath, bytes.NewReader(requestBody))
+	req, err := http.NewRequestWithContext(
+		incomingReq.Context(),
+		http.MethodPost,
+		handlers.APIServerBaseURL()+ssarAPIPath,
+		bytes.NewReader(requestBody),
+	)
 	if err != nil {
 		return selfSubjectAccessReviewStatus{}, err
 	}

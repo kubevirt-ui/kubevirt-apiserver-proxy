@@ -2,11 +2,27 @@ package handlers
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
+)
+
+const (
+	serviceAccountCAPath           = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	defaultK8sTimeout              = 30 * time.Second
+	defaultK8sIdleConnTimeout      = 90 * time.Second
+	defaultK8sTLSHandshakeTimeout  = 10 * time.Second
+)
+
+var (
+	k8sHTTPClient     *http.Client
+	k8sHTTPClientOnce sync.Once
 )
 
 var APIServerURL = getEnvOrDefault("KUBE_API_SERVER", "kubernetes.default.svc")
@@ -22,15 +38,52 @@ func APIServerBaseURL() string {
 	return "https://" + APIServerURL
 }
 
+// NewK8sHTTPClient returns the shared Kubernetes API HTTP client for this process.
 func NewK8sHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+	k8sHTTPClientOnce.Do(func() {
+		k8sHTTPClient = &http.Client{
+			Timeout: defaultK8sTimeout,
+			Transport: &http.Transport{
+				TLSClientConfig:     k8sTLSConfig(),
+				TLSHandshakeTimeout: defaultK8sTLSHandshakeTimeout,
+				IdleConnTimeout:     defaultK8sIdleConnTimeout,
+			},
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+	})
+
+	return k8sHTTPClient
+}
+
+func k8sTLSConfig() *tls.Config {
+	return k8sTLSConfigFromPath(serviceAccountCAPath)
+}
+
+func k8sTLSConfigFromPath(caPath string) *tls.Config {
+	cfg := &tls.Config{}
+
+	caPEM, caErr := os.ReadFile(caPath)
+	if caErr == nil {
+		pool := x509.NewCertPool()
+		if pool.AppendCertsFromPEM(caPEM) {
+			cfg.RootCAs = pool
+			return cfg
+		}
+
+		log.Printf("Warning: service account CA at %s is present but could not be parsed", caPath)
+		if os.Getenv("KUBE_TLS_INSECURE") == "true" {
+			cfg.InsecureSkipVerify = true
+		}
+		return cfg
 	}
+
+	if os.Getenv("APP_ENV") == "dev" || os.Getenv("KUBE_TLS_INSECURE") == "true" {
+		cfg.InsecureSkipVerify = true
+	}
+
+	return cfg
 }
 
 func ForwardAuthHeaders(from *http.Request, to *http.Request) {

@@ -3,6 +3,7 @@ package allowednamespaces
 import (
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 )
 
@@ -59,6 +60,10 @@ func filterAllowedNamespaces(
 	}
 
 	wg.Wait()
+	sort.Strings(allowed)
+	sort.Slice(failures, func(i, j int) bool {
+		return failures[i].Namespace < failures[j].Namespace
+	})
 	return allowed, failures
 }
 

@@ -63,4 +63,8 @@ func Handler(c *gin.Context) {
 		AllowedNamespaces: allowedNamespaces,
 		Failures:          failures,
 	})
+	if len(failures) > 0 {
+		// gin-cache skips storing aborted 2xx responses.
+		c.Abort()
+	}
 }
