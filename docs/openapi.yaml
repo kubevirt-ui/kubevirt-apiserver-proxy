@@ -1,0 +1,357 @@
+openapi: 3.0.3
+info:
+  title: KubeVirt API server proxy
+  description: |
+    HTTP API for the kubevirt-apiserver-proxy sidecar used by the KubeVirt UI.
+
+    This specification documents endpoints implemented by the proxy itself.
+    `GET /apis/{apiPath}` forwards to the cluster Kubernetes API; request and response
+    bodies follow upstream API schemas (see the Kubernetes API reference). The proxy
+    may add `totalItems` and filter `items` when query parameters are present on list
+    responses.
+  version: 0.0.10
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (`APP_ENV=dev`, plain HTTP)
+  - url: https://localhost:8080
+    description: Production pod (TLS on port 8080)
+
+paths:
+  /health:
+    get:
+      summary: Liveness and TLS readiness
+      description: |
+        Reports process status and whether required TLS material is available.
+
+        Returns `200` when `ready` is true (serving certificate and key are present
+        when TLS is required). Returns `503` when the process is running but not
+        ready to serve HTTPS in production mode.
+
+        Responses may be cached for 30 seconds (by request URI).
+      operationId: getHealth
+      tags:
+        - Operations
+      responses:
+        "200":
+          description: Proxy is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                ready: true
+                appEnv: dev
+                kubeAPIServer: kubernetes.default.svc
+                servingTLS:
+                  required: false
+                  certPath: ./cert/tls.crt
+                  keyPath: ./cert/tls.key
+                  certLoaded: false
+                  keyLoaded: false
+                kubernetes:
+                  serviceAccountCAPath: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                  serviceAccountCAPresent: true
+                  serviceAccountCAValid: true
+        "503":
+          description: Proxy is alive but not ready (missing serving TLS material in production mode)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /apis/allowednamespaces:
+    post:
+      summary: Namespaces allowed for a Kubernetes action
+      description: |
+        Lists cluster namespaces where the caller may perform the action described in
+        `resourceAttributes`, using SelfSubjectAccessReview (SSAR) against the API server.
+        The caller's `Authorization` header is required and forwarded for each review.
+
+        Optional query parameter `maxConcurrency` limits parallel SSAR checks (positive
+        integer, capped by server configuration). When omitted, the server default applies.
+
+        Successful responses may be cached for 15 seconds (keyed by auth headers and
+        request body). Responses that include `failures` are not cached.
+      operationId: postAllowedNamespaces
+      tags:
+        - Operations
+      parameters:
+        - name: maxConcurrency
+          in: query
+          required: false
+          description: Maximum parallel SSAR checks (positive integer, server-capped)
+          schema:
+            type: integer
+            minimum: 1
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token used for namespace list and SSAR calls
+          schema:
+            type: string
+          example: Bearer eyJhbGciOiJSUzI1NiIs...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AllowedNamespacesRequest"
+            example:
+              resourceAttributes:
+                verb: get
+                group: kubevirt.io
+                resource: virtualmachines
+      responses:
+        "200":
+          description: Allowed namespaces (possibly with per-namespace SSAR failures)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllowedNamespacesResponse"
+        "400":
+          description: Invalid request body or query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid Authorization header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to reach the Kubernetes API server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /apis/{apiPath}:
+    get:
+      summary: Kubernetes API proxy (GET)
+      description: |
+        Forwards the request to the cluster API server configured by `KUBE_API_SERVER`
+        (default `kubernetes.default.svc`). The caller's `Authorization` header is passed
+        through. WebSocket upgrades use the same path prefix with impersonation metadata
+        in subprotocols when applicable.
+
+        **List filtering:** If the client sends query parameters and the upstream response
+        is a Kubernetes list (`items` array), the proxy may filter `items` server-side.
+        The JSON body includes `totalItems` (upstream list length) and `items` (filtered
+        when query parameters are present). Filter keys are JSON paths (for example
+        `status.printableStatus=Error` for VirtualMachine error states).
+
+        Responses may be cached for 15 seconds (full request URI including query string).
+      operationId: proxyKubernetesGet
+      tags:
+        - Kubernetes proxy
+      parameters:
+        - name: apiPath
+          in: path
+          required: true
+          description: |
+            Kubernetes API path after `/apis/`, for example
+            `kubevirt.io/v1/namespaces/default/virtualmachines`.
+          schema:
+            type: string
+          examples:
+            virtualMachineList:
+              value: kubevirt.io/v1/namespaces/default/virtualmachines
+        - name: Authorization
+          in: header
+          required: false
+          description: Bearer token forwarded to the API server
+          schema:
+            type: string
+          example: Bearer eyJhbGciOiJSUzI1NiIs...
+      responses:
+        "200":
+          description: Upstream success (body shape depends on the Kubernetes resource)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxiedListResponse"
+        "401":
+          description: Upstream unauthorized
+        "403":
+          description: Upstream forbidden
+        "404":
+          description: Upstream not found
+        "500":
+          description: Proxy failed to reach the API server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        default:
+          description: Upstream status code and body are passed through when possible
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - ready
+        - appEnv
+        - kubeAPIServer
+        - servingTLS
+        - kubernetes
+      properties:
+        status:
+          type: string
+          description: Always `ok` when the handler responds
+          example: ok
+        ready:
+          type: boolean
+          description: |
+            False when production mode requires serving TLS files and either
+            certificate or key is missing
+        appEnv:
+          type: string
+          description: Value of `APP_ENV` (empty when unset; `dev` disables serving TLS requirement)
+          example: dev
+        kubeAPIServer:
+          type: string
+          description: API server host from `KUBE_API_SERVER`
+          example: kubernetes.default.svc
+        servingTLS:
+          $ref: "#/components/schemas/ServingTLSHealth"
+        kubernetes:
+          $ref: "#/components/schemas/KubernetesHealth"
+
+    ServingTLSHealth:
+      type: object
+      required:
+        - required
+        - certPath
+        - keyPath
+        - certLoaded
+        - keyLoaded
+      properties:
+        required:
+          type: boolean
+          description: True when `APP_ENV` is not `dev`
+        certPath:
+          type: string
+          description: Path checked for the serving certificate (`SERVING_TLS_CERT_PATH` or default)
+        keyPath:
+          type: string
+          description: Path checked for the serving private key (`SERVING_TLS_KEY_PATH` or default)
+        certLoaded:
+          type: boolean
+        keyLoaded:
+          type: boolean
+
+    KubernetesHealth:
+      type: object
+      required:
+        - serviceAccountCAPath
+        - serviceAccountCAPresent
+        - serviceAccountCAValid
+      properties:
+        serviceAccountCAPath:
+          type: string
+          description: Path to the in-cluster service account CA bundle
+        serviceAccountCAPresent:
+          type: boolean
+        serviceAccountCAValid:
+          type: boolean
+          description: True when the file exists and contains parseable PEM certificates
+
+    ProxiedListResponse:
+      type: object
+      description: |
+        Typical list response after proxying. Additional fields from the upstream API
+        are preserved. When query filters are applied, `items` may be a subset of the
+        upstream list.
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        totalItems:
+          type: integer
+          description: Number of items in the upstream list before filtering
+      additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    AllowedNamespacesRequest:
+      type: object
+      required:
+        - resourceAttributes
+      properties:
+        resourceAttributes:
+          $ref: "#/components/schemas/ResourceAttributes"
+
+    AllowedNamespacesResponse:
+      type: object
+      required:
+        - allowedNamespaces
+      properties:
+        allowedNamespaces:
+          type: array
+          items:
+            type: string
+          description: Namespaces where SSAR allowed the requested action
+        failures:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamespaceFailure"
+          description: Per-namespace SSAR errors (omitted when empty)
+
+    NamespaceFailure:
+      type: object
+      required:
+        - namespace
+        - error
+      properties:
+        namespace:
+          type: string
+        error:
+          type: string
+
+    ResourceAttributes:
+      type: object
+      required:
+        - verb
+      properties:
+        namespace:
+          type: string
+        verb:
+          type: string
+          description: Kubernetes verb (for example `get`, `list`, `create`)
+        group:
+          type: string
+        version:
+          type: string
+        resource:
+          type: string
+        subresource:
+          type: string
+        name:
+          type: string
+
+tags:
+  - name: Operations
+    description: Proxy-owned endpoints
+  - name: Kubernetes proxy
+    description: Pass-through to the cluster API server
