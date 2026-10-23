@@ -14,11 +14,6 @@ import (
 var PROTOCOL string = "https"
 var ORIGIN = "http://localhost"
 
-func HealthHandler(c *gin.Context) {
-	defer c.Request.Body.Close()
-	c.String(200, "OK")
-}
-
 func RequestHandler(c *gin.Context) {
 	if c.Request.URL.Scheme == "" {
 		c.Request.URL.Scheme = "https"

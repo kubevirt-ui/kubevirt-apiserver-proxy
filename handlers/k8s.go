@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	serviceAccountCAPath           = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	defaultServiceAccountCAPath    = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	defaultK8sTimeout              = 30 * time.Second
 	defaultK8sIdleConnTimeout      = 90 * time.Second
 	defaultK8sTLSHandshakeTimeout  = 10 * time.Second
@@ -57,8 +57,15 @@ func NewK8sHTTPClient() *http.Client {
 	return k8sHTTPClient
 }
 
+func serviceAccountCAPath() string {
+	if path := os.Getenv("SERVICE_ACCOUNT_CA_PATH"); path != "" {
+		return path
+	}
+	return defaultServiceAccountCAPath
+}
+
 func k8sTLSConfig() *tls.Config {
-	return k8sTLSConfigFromPath(serviceAccountCAPath)
+	return k8sTLSConfigFromPath(serviceAccountCAPath())
 }
 
 func k8sTLSConfigFromPath(caPath string) *tls.Config {

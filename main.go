@@ -6,20 +6,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
-	cache "github.com/chenyahui/gin-cache"
-	"github.com/chenyahui/gin-cache/persist"
-	"github.com/gin-contrib/gzip"
-	"github.com/gin-gonic/gin"
 	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/config"
 	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/handlers"
-	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/handlers/allowednamespaces"
-)
-
-const (
-	healthCacheTime = 30 * time.Second
-	apiCacheTime    = 15 * time.Second
+	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/server"
 )
 
 func main() {
@@ -30,17 +20,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	router := gin.Default()
+	router := server.NewRouter()
 
-	memoryStore := persist.NewMemoryStore(1 * time.Minute)
-
-	router.Use(gzip.Gzip(gzip.DefaultCompression))
-
-	router.GET("/health", cache.CacheByRequestURI(memoryStore, healthCacheTime), handlers.HealthHandler)
-	router.POST("/apis/allowednamespaces", allowednamespaces.CacheMiddleware(memoryStore, apiCacheTime), allowednamespaces.Handler)
-	router.GET("/apis/*path", cache.CacheByRequestURI(memoryStore, apiCacheTime), handlers.RequestHandler)
-
-	server := &http.Server{
+	httpServer := &http.Server{
 		Addr:      ":8080",
 		Handler:   router,
 		TLSConfig: &tls.Config{},
@@ -48,27 +30,23 @@ func main() {
 
 	minTLSVer := cfg.GetMinTLSVersion()
 	if minTLSVer != 0 {
-		server.TLSConfig.MinVersion = minTLSVer
+		httpServer.TLSConfig.MinVersion = minTLSVer
 	}
 
 	if minTLSVer < tls.VersionTLS13 {
 		if ciphers := cfg.GetTLSCipherSuites(); len(ciphers) > 0 {
-			server.TLSConfig.CipherSuites = ciphers
+			httpServer.TLSConfig.CipherSuites = ciphers
 		}
 	}
 
-	server.TLSConfig.CurvePreferences = cfg.GetTLSCurveIDs()
+	httpServer.TLSConfig.CurvePreferences = cfg.GetTLSCurveIDs()
 
-	server.TLSConfig.GetConfigForClient = func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
-		return server.TLSConfig.Clone(), nil
-	}
-
-	log.Printf("listening for server 8080 - v0.0.10 - API cache time: %v", apiCacheTime)
+	log.Printf("listening for server 8080 - v0.0.10 - API cache time: %v", server.APICacheTime)
 
 	if os.Getenv("APP_ENV") == "dev" {
-		err = server.ListenAndServe()
+		err = httpServer.ListenAndServe()
 	} else {
-		err = server.ListenAndServeTLS("./cert/tls.crt", "./cert/tls.key")
+		err = httpServer.ListenAndServeTLS(handlers.ServingCertPathForListen(), handlers.ServingKeyPathForListen())
 	}
 
 	if err != nil {

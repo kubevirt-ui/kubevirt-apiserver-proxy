@@ -12,6 +12,8 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -21,6 +23,5 @@ jobs:
 
       - name: Build
         run: go build .
-      - name: Run Unit Tests
+      - name: Run tests
         run: go test ./...
-        
