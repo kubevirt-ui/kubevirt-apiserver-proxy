@@ -76,7 +76,7 @@ paths:
         Optional query parameter `maxConcurrency` limits parallel SSAR checks (positive
         integer, capped by server configuration). When omitted, the server default applies.
 
-        Successful responses may be cached for 15 seconds (keyed by auth headers and
+        Successful responses may be cached for 2 minutes (keyed by auth headers and
         request body). Responses that include `failures` are not cached.
       operationId: postAllowedNamespaces
       tags:

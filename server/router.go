@@ -12,20 +12,21 @@ import (
 )
 
 const (
-	HealthCacheTime = 30 * time.Second
-	APICacheTime    = 15 * time.Second
+	HealthCacheTime              = 30 * time.Second
+	APICacheTime                 = 15 * time.Second
+	AllowedNamespacesCacheTime   = 2 * time.Minute
 )
 
 // NewRouter returns the HTTP router used by the proxy process.
 func NewRouter() *gin.Engine {
 	router := gin.Default()
 
-	memoryStore := persist.NewMemoryStore(1 * time.Minute)
+	memoryStore := persist.NewMemoryStore(AllowedNamespacesCacheTime)
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	router.GET("/health", cache.CacheByRequestURI(memoryStore, HealthCacheTime), handlers.HealthHandler)
-	router.POST("/apis/allowednamespaces", allowednamespaces.CacheMiddleware(memoryStore, APICacheTime), allowednamespaces.Handler)
+	router.POST("/apis/allowednamespaces", allowednamespaces.CacheMiddleware(memoryStore, AllowedNamespacesCacheTime), allowednamespaces.Handler)
 	router.GET("/apis/*path", apiProxyCacheMiddleware(memoryStore, APICacheTime), handlers.RequestHandler)
 
 	return router
