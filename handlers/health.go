@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	defaultServingCertPath        = "./cert/tls.crt"
-	defaultServingKeyPath         = "./cert/tls.key"
-	defaultServiceAccountCAPath   = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	defaultServingCertPath = "./cert/tls.crt"
+	defaultServingKeyPath  = "./cert/tls.key"
 )
 
 // HealthResponse describes proxy liveness and whether required TLS material is present.
@@ -62,13 +61,6 @@ func servingKeyPath() string {
 		return path
 	}
 	return defaultServingKeyPath
-}
-
-func serviceAccountCAPath() string {
-	if path := os.Getenv("SERVICE_ACCOUNT_CA_PATH"); path != "" {
-		return path
-	}
-	return defaultServiceAccountCAPath
 }
 
 func isDevMode() bool {

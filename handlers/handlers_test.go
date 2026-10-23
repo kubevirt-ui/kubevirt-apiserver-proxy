@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,6 +13,8 @@ import (
 
 func TestRequestHandler_VMListFiltering(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	t.Setenv("APP_ENV", "dev")
+	t.Setenv("SERVICE_ACCOUNT_CA_PATH", filepath.Join(t.TempDir(), "missing-ca.crt"))
 
 	const vmListPath = "/apis/kubevirt.io/v1/namespaces/default/virtualmachines"
 
