@@ -1,4 +1,4 @@
-package handlers
+package handlers_test
 
 import (
 	"encoding/json"
@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/handlers"
+	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/server"
 )
 
 func TestRequestHandler_VMListFiltering(t *testing.T) {
@@ -37,18 +39,18 @@ func TestRequestHandler_VMListFiltering(t *testing.T) {
 	}))
 	defer apiServer.Close()
 
-	originalAPIServerURL := APIServerURL
-	APIServerURL = strings.TrimPrefix(apiServer.URL, "https://")
+	originalAPIServerURL := handlers.APIServerURL
+	handlers.APIServerURL = strings.TrimPrefix(apiServer.URL, "https://")
 	t.Cleanup(func() {
-		APIServerURL = originalAPIServerURL
+		handlers.APIServerURL = originalAPIServerURL
 	})
+
+	router := server.NewRouter()
 
 	runRequest := func(t *testing.T, path string) map[string]interface{} {
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest(http.MethodGet, path, nil)
-
-		RequestHandler(c)
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		router.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())

@@ -41,11 +41,6 @@ func main() {
 
 	httpServer.TLSConfig.CurvePreferences = cfg.GetTLSCurveIDs()
 
-	clientCfg := httpServer.TLSConfig.Clone()
-	httpServer.TLSConfig.GetConfigForClient = func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
-		return clientCfg.Clone(), nil
-	}
-
 	log.Printf("listening for server 8080 - v0.0.10 - API cache time: %v", server.APICacheTime)
 
 	if os.Getenv("APP_ENV") == "dev" {

@@ -77,6 +77,8 @@ paths:
       operationId: postAllowedNamespaces
       tags:
         - Operations
+      security:
+        - bearerAuth: []
       parameters:
         - name: maxConcurrency
           in: query
@@ -85,13 +87,6 @@ paths:
           schema:
             type: integer
             minimum: 1
-        - name: Authorization
-          in: header
-          required: true
-          description: Bearer token used for namespace list and SSAR calls
-          schema:
-            type: string
-          example: Bearer eyJhbGciOiJSUzI1NiIs...
       requestBody:
         required: true
         content:
@@ -148,6 +143,8 @@ paths:
       operationId: proxyKubernetesGet
       tags:
         - Kubernetes proxy
+      security:
+        - bearerAuth: []
       parameters:
         - name: apiPath
           in: path
@@ -160,13 +157,6 @@ paths:
           examples:
             virtualMachineList:
               value: kubevirt.io/v1/namespaces/default/virtualmachines
-        - name: Authorization
-          in: header
-          required: false
-          description: Bearer token forwarded to the API server
-          schema:
-            type: string
-          example: Bearer eyJhbGciOiJSUzI1NiIs...
       responses:
         "200":
           description: Upstream success (body shape depends on the Kubernetes resource)
@@ -190,6 +180,13 @@ paths:
           description: Upstream status code and body are passed through when possible
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token forwarded to the Kubernetes API server
+
   schemas:
     HealthResponse:
       type: object
