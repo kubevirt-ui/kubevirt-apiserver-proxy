@@ -26,7 +26,7 @@ func NewRouter() *gin.Engine {
 
 	router.GET("/health", cache.CacheByRequestURI(memoryStore, HealthCacheTime), handlers.HealthHandler)
 	router.POST("/apis/allowednamespaces", allowednamespaces.CacheMiddleware(memoryStore, APICacheTime), allowednamespaces.Handler)
-	router.GET("/apis/*path", cache.CacheByRequestURI(memoryStore, APICacheTime), handlers.RequestHandler)
+	router.GET("/apis/*path", apiProxyCacheMiddleware(memoryStore, APICacheTime), handlers.RequestHandler)
 
 	return router
 }

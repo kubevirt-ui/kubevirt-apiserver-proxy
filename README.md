@@ -46,7 +46,7 @@ Forwards the request to the cluster API server (`KUBE_API_SERVER`, default `kube
 
 The response includes `totalItems` (count from the upstream list before filtering) and `items` (filtered when query parameters are present).
 
-- **Caching:** 15 seconds (by full request URI including query string)
+- **Caching:** 15 seconds (by full request URI, query string, `Authorization`, and impersonation headers)
 - **Local dev:** set `APP_ENV=dev` for plain HTTP on port `8080`
 
 ## Usage

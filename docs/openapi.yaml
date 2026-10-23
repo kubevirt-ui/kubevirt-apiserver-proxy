@@ -11,6 +11,9 @@ info:
     responses.
   version: 0.0.10
 
+security:
+  - bearerAuth: []
+
 servers:
   - url: http://localhost:8080
     description: Local development (`APP_ENV=dev`, plain HTTP)
@@ -32,6 +35,7 @@ paths:
       operationId: getHealth
       tags:
         - Operations
+      security: []
       responses:
         "200":
           description: Proxy is ready
@@ -139,7 +143,8 @@ paths:
         when query parameters are present). Filter keys are JSON paths (for example
         `status.printableStatus=Error` for VirtualMachine error states).
 
-        Responses may be cached for 15 seconds (full request URI including query string).
+        Responses may be cached for 15 seconds (request URI, query string, bearer
+        token, and impersonation headers).
       operationId: proxyKubernetesGet
       tags:
         - Kubernetes proxy
