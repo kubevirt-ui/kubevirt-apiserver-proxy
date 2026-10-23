@@ -28,7 +28,7 @@ Returns the namespaces where the caller is allowed to perform a Kubernetes actio
 - **Authorization:** Bearer token in the `Authorization` header (required)
 - **Query:** optional `maxConcurrency` (positive integer, capped by server configuration) to tune parallel SSAR checks
 - **Response:** `allowedNamespaces` (string array) and optional `failures` (per-namespace SSAR errors)
-- **Caching:** 15 seconds (keyed by auth headers and request body; responses with `failures` are not cached)
+- **Caching:** 2 minutes (keyed by auth headers and request body; responses with `failures` are not cached)
 
 ### `GET /apis/*`
 
