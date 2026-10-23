@@ -73,7 +73,7 @@ paths:
         `resourceAttributes`, using SelfSubjectAccessReview (SSAR) against the API server.
         The caller's `Authorization` header is required and forwarded for each review.
 
-        Optional query parameter `maxConcurrency` limits parallel SSAR checks (positive
+        Optional `maxConcurrency` in the request body limits parallel SSAR checks (positive
         integer, capped by server configuration). When omitted, the server default applies.
 
         Successful responses may be cached for 2 minutes (keyed by auth headers and
@@ -83,14 +83,6 @@ paths:
         - Operations
       security:
         - bearerAuth: []
-      parameters:
-        - name: maxConcurrency
-          in: query
-          required: false
-          description: Maximum parallel SSAR checks (positive integer, server-capped)
-          schema:
-            type: integer
-            minimum: 1
       requestBody:
         required: true
         content:
@@ -110,7 +102,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AllowedNamespacesResponse"
         "400":
-          description: Invalid request body or query parameters
+          description: Invalid request body
           content:
             application/json:
               schema:
@@ -303,6 +295,12 @@ components:
       properties:
         resourceAttributes:
           $ref: "#/components/schemas/ResourceAttributes"
+        maxConcurrency:
+          type: integer
+          minimum: 1
+          description: |
+            Maximum parallel SSAR checks (server-capped). When omitted, the default from
+            `ALLOWED_NS_MAX_CONCURRENCY` applies.
 
     AllowedNamespacesResponse:
       type: object

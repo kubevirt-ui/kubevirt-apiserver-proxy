@@ -37,7 +37,7 @@ func Handler(c *gin.Context) {
 		return
 	}
 
-	maxConcurrency, err := resolveMaxConcurrency(c)
+	maxConcurrency, err := resolveMaxConcurrency(request.MaxConcurrency)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

@@ -2,6 +2,7 @@ package allowednamespaces
 
 type AllowedNamespacesRequest struct {
 	ResourceAttributes ResourceAttributes `json:"resourceAttributes"`
+	MaxConcurrency     *int               `json:"maxConcurrency,omitempty"`
 }
 
 type AllowedNamespacesResponse struct {

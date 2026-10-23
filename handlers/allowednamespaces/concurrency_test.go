@@ -10,12 +10,7 @@ import (
 )
 
 func TestResolveMaxConcurrencyUsesDefault(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = httptest.NewRequest(http.MethodPost, "/apis/allowednamespaces", nil)
-
-	maxConcurrency, err := resolveMaxConcurrency(c)
+	maxConcurrency, err := resolveMaxConcurrency(nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -25,13 +20,9 @@ func TestResolveMaxConcurrencyUsesDefault(t *testing.T) {
 	}
 }
 
-func TestResolveMaxConcurrencyUsesQueryParam(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = httptest.NewRequest(http.MethodPost, "/apis/allowednamespaces?maxConcurrency=5", nil)
-
-	maxConcurrency, err := resolveMaxConcurrency(c)
+func TestResolveMaxConcurrencyUsesRequestBody(t *testing.T) {
+	value := 5
+	maxConcurrency, err := resolveMaxConcurrency(&value)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -42,12 +33,8 @@ func TestResolveMaxConcurrencyUsesQueryParam(t *testing.T) {
 }
 
 func TestResolveMaxConcurrencyClampsToCap(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = httptest.NewRequest(http.MethodPost, "/apis/allowednamespaces?maxConcurrency=9999", nil)
-
-	maxConcurrency, err := resolveMaxConcurrency(c)
+	value := 9999
+	maxConcurrency, err := resolveMaxConcurrency(&value)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -57,19 +44,15 @@ func TestResolveMaxConcurrencyClampsToCap(t *testing.T) {
 	}
 }
 
-func TestResolveMaxConcurrencyRejectsInvalidQueryParam(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = httptest.NewRequest(http.MethodPost, "/apis/allowednamespaces?maxConcurrency=abc", nil)
-
-	_, err := resolveMaxConcurrency(c)
+func TestResolveMaxConcurrencyRejectsInvalidValue(t *testing.T) {
+	value := 0
+	_, err := resolveMaxConcurrency(&value)
 	if err == nil {
 		t.Fatal("expected error for invalid maxConcurrency")
 	}
 }
 
-func TestHandlerRejectsInvalidMaxConcurrencyQueryParam(t *testing.T) {
+func TestHandlerRejectsInvalidMaxConcurrencyInBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
@@ -77,8 +60,8 @@ func TestHandlerRejectsInvalidMaxConcurrencyQueryParam(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodPost,
-		"/apis/allowednamespaces?maxConcurrency=0",
-		strings.NewReader(`{"resourceAttributes":{"verb":"get","resource":"pods"}}`),
+		"/apis/allowednamespaces",
+		strings.NewReader(`{"maxConcurrency":0,"resourceAttributes":{"verb":"get","resource":"pods"}}`),
 	)
 	req.Header.Set("Authorization", "Bearer test-token")
 	req.Header.Set("Content-Type", "application/json")
