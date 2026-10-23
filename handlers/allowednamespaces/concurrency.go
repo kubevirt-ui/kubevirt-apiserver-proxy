@@ -4,14 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/gin-gonic/gin"
 )
 
 const (
-	maxConcurrencyQueryParam = "maxConcurrency"
-	maxConcurrencyEnvVar       = "ALLOWED_NS_MAX_CONCURRENCY"
-	maxConcurrencyCapEnvVar    = "ALLOWED_NS_MAX_CONCURRENCY_CAP"
+	maxConcurrencyEnvVar    = "ALLOWED_NS_MAX_CONCURRENCY"
+	maxConcurrencyCapEnvVar = "ALLOWED_NS_MAX_CONCURRENCY_CAP"
 
 	fallbackMaxConcurrentSSARChecks = 20
 	fallbackMaxConcurrentSSARCap    = 100
@@ -36,14 +33,13 @@ func envInt(key string, fallback int) int {
 	return parsed
 }
 
-func resolveMaxConcurrency(c *gin.Context) (int, error) {
-	queryValue := c.Query(maxConcurrencyQueryParam)
-	if queryValue == "" {
+func resolveMaxConcurrency(requestValue *int) (int, error) {
+	if requestValue == nil {
 		return defaultMaxConcurrentSSARChecks, nil
 	}
 
-	maxConcurrency, err := strconv.Atoi(queryValue)
-	if err != nil || maxConcurrency < 1 {
+	maxConcurrency := *requestValue
+	if maxConcurrency < 1 {
 		return 0, fmt.Errorf("maxConcurrency must be a positive integer")
 	}
 

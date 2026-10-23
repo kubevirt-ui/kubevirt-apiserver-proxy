@@ -24,9 +24,8 @@ Enable **Settings → Pages → Build and deployment → GitHub Actions** if the
 
 Returns the namespaces where the caller is allowed to perform a Kubernetes action, using SelfSubjectAccessReview (SSAR) against the cluster API server.
 
-- **Request body:** JSON with `resourceAttributes` (at minimum `verb`; optional `group`, `version`, `resource`, `subresource`, `namespace`, `name`)
+- **Request body:** JSON with `resourceAttributes` (at minimum `verb`; optional `group`, `version`, `resource`, `subresource`, `namespace`, `name`) and optional `maxConcurrency` (positive integer, server-capped) to tune parallel SSAR checks
 - **Authorization:** Bearer token in the `Authorization` header (required)
-- **Query:** optional `maxConcurrency` (positive integer, capped by server configuration) to tune parallel SSAR checks
 - **Response:** `allowedNamespaces` (string array) and optional `failures` (per-namespace SSAR errors)
 - **Caching:** 2 minutes (keyed by auth headers and request body; responses with `failures` are not cached)
 
