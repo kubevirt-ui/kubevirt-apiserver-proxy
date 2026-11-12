@@ -24,14 +24,39 @@ Enable **Settings → Pages → Build and deployment → GitHub Actions** if the
 
 Returns the namespaces where the caller is allowed to perform a Kubernetes action, using SelfSubjectAccessReview (SSAR) against the cluster API server.
 
-- **Request body:** JSON with `resourceAttributes` (at minimum `verb`; optional `group`, `version`, `resource`, `subresource`, `namespace`, `name`) and optional `maxConcurrency` (positive integer, server-capped) to tune parallel SSAR checks
+- **Request body:** JSON with `resourceAttributes` (at minimum `verb`; optional `cluster` for ACM spoke routing, `group`, `version`, `resource`, `subresource`, `namespace`, `name`) and optional `maxConcurrency` (positive integer, server-capped)
 - **Authorization:** Bearer token in the `Authorization` header (required)
 - **Response:** `allowedNamespaces` (string array) and optional `failures` (per-namespace SSAR errors)
 - **Caching:** 2 minutes (keyed by auth headers and request body; responses with `failures` are not cached)
 
-### `GET /apis/*`
+### `GET /api/*` and `GET /apis/*`
 
-Forwards the request to the cluster API server (`KUBE_API_SERVER`, default `kubernetes.default.svc`). The caller's `Authorization` header (and websocket subprotocol impersonation headers when applicable) are passed through. This is not limited to VirtualMachine resources; any API path the UI requests can be proxied, subject to the user's RBAC on the cluster.
+Kubernetes has two URL prefixes:
+
+- **`GET /api/*`** — core API (`/api/v1/namespaces/.../persistentvolumeclaims`, Pods, Secrets, …)
+- **`GET /apis/*`** — named API groups (`/apis/kubevirt.io/v1/...`). Paths must include **`{group}/{version}/`**; `/apis/v1/...` without a group returns **400** (use `/api/v1/...` for core resources).
+
+Both routes forward to the hub API server when the path has **no** `/cluster/{name}/` segment. For a managed cluster, insert **`cluster/{clusterName}/`** after `/api/` or `/apis/`:
+
+- Hub: `GET /apis/kubevirt.io/v1/namespaces/default/virtualmachines`
+- Spoke: `GET /apis/cluster/bm07/kubevirt.io/v1/namespaces/default/virtualmachines`
+- Core on spoke: `GET /api/cluster/bm07/v1/namespaces/default/persistentvolumeclaims`
+
+The hub cluster name (`localHubName`, discovered by listing hub `ManagedCluster` objects with `local-cluster=true`, then ACM console `GET /hub` if needed, cached) can be used in the path the same way; it still targets the hub API directly. Multicluster routing uses the ACM **cluster-proxy** addon for other cluster names. The caller's `Authorization` header (and websocket subprotocol impersonation headers when applicable) are passed through.
+
+### Multicluster (ACM)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CLUSTER_PROXY_ENABLED` | enabled | Set to `false` to disable cluster-proxy routing |
+| `CLUSTER_PROXY_ADDON_HOST` | `cluster-proxy-addon-user.multicluster-engine.svc.cluster.local` | cluster-proxy Service host |
+| `CLUSTER_PROXY_ADDON_PORT` | `9092` | cluster-proxy port |
+| `ACM_CONSOLE_BACKEND_URL` | `https://console-chart-console-v2.open-cluster-management.svc:3000` | Base URL for `GET /hub` hub discovery (RHACM console backend on the hub) |
+| `ACM_CONSOLE_HUB_URL` | (derived from backend URL) | Full override URL for hub configuration |
+| `ACM_HUB_CONFIG_CACHE_TTL` | `24h` | Cache TTL for successful `localHubName` discovery |
+| `ACM_HUB_DISCOVERY_FAILURE_CACHE_TTL` | `1m` | Backoff when hub discovery fails (avoids hammering `/hub` and ManagedCluster list) |
+
+`POST /apis/allowednamespaces` lists namespaces on the target cluster (hub or `resourceAttributes.cluster`) and runs SSAR via cluster-proxy when a managed cluster is selected.
 
 **List filtering (optional):** When the client sends query parameters on a **list** response (`items` array), the proxy can filter items server-side before returning JSON to the UI. This is primarily used for large VirtualMachine lists. Examples:
 
