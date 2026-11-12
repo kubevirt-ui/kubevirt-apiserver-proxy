@@ -45,6 +45,12 @@ func Handler(c *gin.Context) {
 	}
 
 	cluster := multicluster.ClusterFromRequest(c.Request, request.ResourceAttributes.Cluster)
+	if cluster != "" {
+		if err := multicluster.ValidateClusterName(cluster); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
 
 	client := handlers.K8sHTTPClientForCluster(cluster, c.Request)
 	candidates, err := listNamespaceCandidates(client, c.Request, cluster)

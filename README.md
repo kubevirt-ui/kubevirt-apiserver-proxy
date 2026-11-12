@@ -42,7 +42,7 @@ Both routes forward to the hub API server when the path has **no** `/cluster/{na
 - Spoke: `GET /apis/cluster/bm07/kubevirt.io/v1/namespaces/default/virtualmachines`
 - Core on spoke: `GET /api/cluster/bm07/v1/namespaces/default/persistentvolumeclaims`
 
-The hub cluster name (`localHubName` from ACM console `GET /hub`, cached) can be used in the path the same way; it still targets the hub API directly. Multicluster routing uses the ACM **cluster-proxy** addon for other cluster names. The caller's `Authorization` header (and websocket subprotocol impersonation headers when applicable) are passed through.
+The hub cluster name (`localHubName`, discovered by listing hub `ManagedCluster` objects with `local-cluster=true`, then ACM console `GET /hub` if needed, cached) can be used in the path the same way; it still targets the hub API directly. Multicluster routing uses the ACM **cluster-proxy** addon for other cluster names. The caller's `Authorization` header (and websocket subprotocol impersonation headers when applicable) are passed through.
 
 ### Multicluster (ACM)
 

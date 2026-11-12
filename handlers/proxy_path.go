@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/handlers/multicluster"
 )
+
+var kubernetesAPIVersionPattern = regexp.MustCompile(`^v[0-9]+((alpha|beta)[0-9]*)?$`)
 
 // NormalizeProxyPath strips an optional /api/cluster/{name}/ or /apis/cluster/{name}/ prefix,
 // validates the Kubernetes API path, and returns the cluster name and upstream path.
@@ -76,5 +79,5 @@ func validateKubernetesAPIPath(path string) error {
 }
 
 func isKubernetesAPIVersion(segment string) bool {
-	return strings.HasPrefix(segment, "v") && len(segment) >= 2
+	return kubernetesAPIVersionPattern.MatchString(segment)
 }

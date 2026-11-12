@@ -86,7 +86,15 @@ func RewriteProxyRequest(req *http.Request, cluster string) {
 	host, port := clusterProxyHostPort()
 	req.URL.Host = net.JoinHostPort(host, port)
 	req.URL.Path = "/" + cluster + req.URL.Path
-	req.Header.Set("Origin", "https://"+host)
+}
+
+// ProxyRequestOrigin returns the Origin header for outbound requests (cluster-proxy when routing to a managed cluster).
+func ProxyRequestOrigin(cluster string, req *http.Request) string {
+	if !UseClusterProxy(cluster, req) {
+		return ""
+	}
+	host, _ := clusterProxyHostPort()
+	return "https://" + host
 }
 
 // KubernetesURL builds an absolute URL for a Kubernetes API path on the hub or a managed cluster.

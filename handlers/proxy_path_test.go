@@ -15,6 +15,7 @@ func TestValidateKubernetesProxyPath(t *testing.T) {
 		{"/apis/cluster/../kubevirt.io/v1/virtualmachines", true},
 		{"/apis/kubevirt.io/cluster/bm07/v1/virtualmachines", true},
 		{"/apis/v1/namespaces/default/persistentvolumeclaims", true},
+		{"/apis/velero.io/v1/backups", false},
 		{"/apis/kubevirt.io/namespaces/default/virtualmachines", true},
 		{"/apis/onlygroup", true},
 		{"/foo/bar", true},

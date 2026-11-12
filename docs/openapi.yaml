@@ -201,8 +201,8 @@ paths:
         are JSON paths (for example `status.printableStatus=Error` for VirtualMachine error
         states).
 
-        Hub cluster name discovery uses the pod service account when available (`GET /hub`
-        and ManagedCluster list).
+        Hub cluster name discovery uses the pod service account when available (ManagedCluster
+        list with `local-cluster=true`, then ACM console `GET /hub` when needed).
 
         Responses may be cached for 15 seconds (request URI, query string, bearer
         token, and impersonation headers).

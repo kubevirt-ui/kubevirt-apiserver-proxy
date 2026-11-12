@@ -129,17 +129,6 @@ func k8sTLSConfigFromPath(caPath string) *tls.Config {
 		}
 	}
 
-	if proxyCAPath := strings.TrimSpace(os.Getenv("CLUSTER_PROXY_CA_PATH")); proxyCAPath != "" {
-		proxyCAPEM, err := os.ReadFile(proxyCAPath)
-		if err != nil {
-			log.Printf("Warning: could not read CLUSTER_PROXY_CA_PATH %s: %v", proxyCAPath, err)
-		} else if pool.AppendCertsFromPEM(proxyCAPEM) {
-			hasRoots = true
-		} else {
-			log.Printf("Warning: could not parse CLUSTER_PROXY_CA_PATH %s", proxyCAPath)
-		}
-	}
-
 	if hasRoots {
 		cfg.RootCAs = pool
 	}

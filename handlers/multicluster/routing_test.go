@@ -66,6 +66,25 @@ func TestRewriteProxyRequestManagedCluster(t *testing.T) {
 	}
 }
 
+func TestProxyRequestOrigin(t *testing.T) {
+	HubClusterNameOverride = "fleet-local"
+	defer func() { HubClusterNameOverride = "" }()
+
+	t.Setenv("CLUSTER_PROXY_ADDON_HOST", "proxy.test")
+	t.Setenv("CLUSTER_PROXY_ADDON_PORT", "9092")
+	req := httptest.NewRequest("GET", "/", nil)
+
+	if got := ProxyRequestOrigin("", req); got != "" {
+		t.Fatalf("hub request origin %q, want empty", got)
+	}
+	if got := ProxyRequestOrigin("fleet-local", req); got != "" {
+		t.Fatalf("hub cluster origin %q, want empty", got)
+	}
+	if got := ProxyRequestOrigin("managed-1", req); got != "https://proxy.test" {
+		t.Fatalf("managed cluster origin %q, want https://proxy.test", got)
+	}
+}
+
 func TestKubernetesURLManagedCluster(t *testing.T) {
 	HubClusterNameOverride = "fleet-local"
 	defer func() { HubClusterNameOverride = "" }()

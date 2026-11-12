@@ -29,17 +29,22 @@ func RequestHandler(c *gin.Context) {
 
 	multicluster.RewriteProxyRequest(c.Request, cluster)
 
+	origin := ORIGIN
+	if clusterOrigin := multicluster.ProxyRequestOrigin(cluster, c.Request); clusterOrigin != "" {
+		origin = clusterOrigin
+	}
+
 	tlsConf := &tls.Config{InsecureSkipVerify: true}
 
 	proxy := &proxy.Proxy{
 		Config: &proxy.Config{
 			TLSClientConfig: tlsConf,
 			Endpoint:        c.Request.URL,
-			Origin:          ORIGIN,
+			Origin:          origin,
 		},
 	}
 
-	c.Request.Header.Set("Origin", ORIGIN)
+	c.Request.Header.Set("Origin", origin)
 	c.Request.Header.Set("Accept-Encoding", "*")
 	defer c.Request.Body.Close()
 

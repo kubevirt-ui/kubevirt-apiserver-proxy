@@ -141,9 +141,12 @@ func discoverLocalHubName(req *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return localHubNameFromManagedClusters(ctx, req)
+	return "", fmt.Errorf("ACM console /hub returned empty localHubName")
 }
 
+// localHubNameFromACMBackend calls the RHACM console backend. Its HTTPS certificate is
+// typically signed by the service-serving CA, not the Kubernetes API CA used by K8sHTTPClientProvider.
+// Use ACM_CONSOLE_HUB_URL or rely on ManagedCluster discovery when TLS verification fails in-cluster.
 func localHubNameFromACMBackend(ctx context.Context, incomingReq *http.Request) (string, error) {
 	url := acmHubConfigurationURL()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
