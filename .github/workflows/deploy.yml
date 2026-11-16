@@ -19,11 +19,11 @@ jobs:
       - uses: docker/login-action@v4
         with:
           registry: quay.io
-          username: ${{ secrets.QUAY_BOT_USER }}
-          password: ${{ secrets.QUAY_BOT_PASS }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: quay.io/kubevirt-ui/kubevirt-apiserver-proxy:${{env.VERSION_TAG}}
+          tags: quay.io/kubevirtui/kubevirt-apiserver-proxy:${{env.VERSION_TAG}}

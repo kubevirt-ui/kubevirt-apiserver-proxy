@@ -86,7 +86,7 @@ spec:
     spec:
       containers:
         - name: kubevirt-apiserver-proxy
-          image: "quay.io/kubevirt-ui/kubevirt-apiserver-proxy"
+          image: "quay.io/kubevirtui/kubevirt-apiserver-proxy"
           ports:
             - containerPort: 8080
               protocol: TCP
