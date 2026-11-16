@@ -26,4 +26,4 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: quay.io/kubevirt-ui/kubevirt-apiserver-proxy:${{env.VERSION_TAG}}
+          tags: quay.io/kubevirtui/kubevirt-apiserver-proxy:${{env.VERSION_TAG}}
