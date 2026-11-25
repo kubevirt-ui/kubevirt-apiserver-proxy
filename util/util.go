@@ -14,6 +14,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 	"golang.org/x/exp/slices"
+
+	"github.com/kubevirt-ui/kubevirt-apiserver-proxy/util/namedfilters"
 )
 
 var HeaderBlacklist = []string{"Cookie", "X-CSRFToken"}
@@ -249,7 +251,42 @@ func itemValueMatchesFilter(itemValue gjson.Result, key string, queryValue strin
 
 const KEY_DELIMITER = "|"
 
-func FilterResponseQuery(bodyBytes []byte, query url.Values) map[string]interface{} {
+// ResourceFromPath extracts the resource plural (e.g. "virtualmachines") from a Kubernetes API
+// request path such as "/apis/<group>/<version>/namespaces/<ns>/<plural>[/<name>]" or the
+// cluster-scoped "/apis/<group>/<version>/<plural>[/<name>]". It returns "" when the path does not
+// contain a recognizable resource segment. The result is used to select the named-filter set; an
+// unrecognized resource simply has no named filters, so keys fall through to yaml-path handling.
+func ResourceFromPath(path string) string {
+	segs := strings.FieldsFunc(path, func(r rune) bool { return r == '/' })
+
+	apisIdx := -1
+	for i, s := range segs {
+		if s == "apis" {
+			apisIdx = i
+			break
+		}
+	}
+	if apisIdx < 0 {
+		return ""
+	}
+
+	// Segments after "apis": group, version, then either [namespaces, <ns>, plural, ...] or [plural, ...].
+	rest := segs[apisIdx+1:]
+	if len(rest) < 3 {
+		return ""
+	}
+	rest = rest[2:] // drop group and version
+
+	if rest[0] == "namespaces" {
+		if len(rest) < 3 {
+			return ""
+		}
+		return rest[2]
+	}
+	return rest[0]
+}
+
+func FilterResponseQuery(bodyBytes []byte, query url.Values, resource string) map[string]interface{} {
 	items := gjson.ParseBytes(bodyBytes).Get("items").Array()
 	filteredJson := []interface{}{}
 	isFilters := len(query) != 0
@@ -261,6 +298,15 @@ func FilterResponseQuery(bodyBytes []byte, query url.Values) map[string]interfac
 				// e.g. same.key=value1,value2&same.key=value3 results in values = []string{"value1,value2", "value3"}
 				// in Kubevirt UI the query string is created such way that the key doesn't repeat, so we can use values[0]
 				value := values[0]
+
+				// Named keys (e.g. "os") are handled by a dedicated matcher that owns the field resolution,
+				// instead of being treated as a yaml path.
+				if matcher := namedfilters.GetMatcherFor(resource, key); matcher != nil {
+					if !matcher(item, strings.Split(value, ",")) {
+						continue nextItem
+					}
+					continue
+				}
 
 				if strings.Contains(key, KEY_DELIMITER) {
 					keys := strings.Split(key, KEY_DELIMITER)
